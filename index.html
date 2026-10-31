@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full overflow-hidden">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BirdCast - Weather & Bird Activity Forecast</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        forest: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            400: '#4ade80',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            700: '#15803d',
+                            800: '#166534',
+                            900: '#14532d',
+                            950: '#052e16',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.6); }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(52, 211, 153, 0.3); border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(52, 211, 153, 0.6); }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 h-screen flex flex-col overflow-hidden selection:bg-emerald-500 selection:text-white">
+
+    <!-- Header & Location Search (Compact) -->
+    <header class="bg-slate-900/90 backdrop-blur-md border-b border-slate-800 shrink-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 py-2 flex flex-col sm:flex-row items-center justify-between gap-2">
+            
+            <!-- Brand Logo -->
+            <div class="flex items-center space-x-2.5 w-full sm:w-auto">
+                <div class="p-2 bg-emerald-600 rounded-lg shadow-md text-white flex items-center justify-center">
+                    <i class="fa-solid fa-feather-pointed text-base"></i>
+                </div>
+                <div>
+                    <h1 class="text-base font-extrabold tracking-tight text-white flex items-center gap-2">
+                        BirdCast <span class="text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-semibold">BETA</span>
+                    </h1>
+                    <p class="text-[11px] text-slate-400">Weather forecast and algorithmic activity predictor.</p>
+                </div>
+            </div>
+
+            <!-- Search Bar & GPS Button -->
+            <div class="flex items-center gap-2 w-full sm:w-80 relative">
+                <div class="relative flex-1">
+                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                        <i class="fa-solid fa-magnifying-glass text-xs"></i>
+                    </span>
+                    <input type="text" id="location-search" placeholder="Search city or location..." 
+                        class="w-full pl-8 pr-7 py-1.5 bg-slate-950/90 border border-slate-700/80 rounded-lg text-xs text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-all">
+                    <button id="clear-search-btn" class="absolute inset-y-0 right-0 pr-2 flex items-center text-slate-400 hover:text-slate-200 hidden">
+                        <i class="fa-solid fa-xmark text-xs"></i>
+                    </button>
+                    <!-- Geocoding Dropdown Suggestions -->
+                    <div id="search-results" class="absolute left-0 right-0 mt-1 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl hidden z-50 max-h-52 overflow-y-auto"></div>
+                </div>
+                
+                <button id="gps-btn" title="Use My Current Location" 
+                    class="p-1.5 px-2.5 bg-slate-800 hover:bg-emerald-600 text-slate-200 hover:text-white rounded-lg transition-all flex items-center justify-center border border-slate-700 shrink-0 text-xs">
+                    <i class="fa-solid fa-crosshairs"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Area: 2-Column Viewport Fit -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 py-3 grid grid-cols-1 lg:grid-cols-12 gap-4 overflow-hidden">
+
+        <!-- LEFT COLUMN: Weather Overview & Baseline Metrics (5 Columns) -->
+        <div class="lg:col-span-5 flex flex-col gap-3 overflow-y-auto custom-scrollbar pr-1 pb-4">
+
+            <!-- Active Location Card -->
+            <div class="bg-slate-900 border border-slate-800 p-3.5 rounded-xl shadow-lg flex items-center justify-between shrink-0">
+                <div>
+                    <h2 id="location-name" class="text-sm font-bold text-white leading-snug">Finding Location...</h2>
+                    <p id="coords-text" class="text-[11px] text-slate-400 font-mono mt-0.5">Lat: --, Lon: --</p>
+                </div>
+                <div class="text-right">
+                    <span id="local-time" class="text-xs font-semibold text-slate-300 font-mono">--:--</span>
+                    <span id="network-badge" class="block text-[9px] text-slate-400 mt-0.5 font-medium">Connecting...</span>
+                </div>
+            </div>
+
+            <!-- Current Weather Conditions Card -->
+            <div class="bg-slate-900 border border-slate-800 p-3.5 rounded-xl shadow-lg space-y-3 shrink-0">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-[11px] font-bold tracking-wider uppercase text-emerald-400 flex items-center gap-1.5">
+                        <i class="fa-solid fa-temperature-half text-emerald-400"></i> Current Weather
+                    </h2>
+                    <span id="weather-desc" class="text-[11px] px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 font-medium">Fetching...</span>
+                </div>
+
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div id="weather-icon-container" class="p-2.5 bg-slate-800/80 rounded-xl text-amber-400 border border-slate-700/60 shadow-inner">
+                            <i class="fa-solid fa-cloud-sun text-2xl"></i>
+                        </div>
+                        <div>
+                            <div class="text-3xl font-extrabold tracking-tight text-white flex items-start">
+                                <span id="current-temp">--</span><span class="text-lg font-normal text-slate-300 ml-0.5">°C</span>
+                            </div>
+                            <p class="text-[11px] text-slate-400">Feels like: <span id="apparent-temp" class="text-slate-200 font-medium">--°C</span></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Weather Attributes Grid -->
+                <div class="grid grid-cols-3 gap-2 pt-2 border-t border-slate-800 text-[11px]">
+                    <div class="bg-slate-950/60 p-2 rounded-lg border border-slate-800">
+                        <span class="text-[9px] font-semibold text-slate-400 uppercase tracking-wider block mb-0.5">Humidity</span>
+                        <div class="font-bold text-slate-200 flex items-center gap-1">
+                            <i class="fa-solid fa-droplet text-blue-400"></i>
+                            <span id="current-humidity">--%</span>
+                        </div>
+                    </div>
+                    <div class="bg-slate-950/60 p-2 rounded-lg border border-slate-800">
+                        <span class="text-[9px] font-semibold text-slate-400 uppercase tracking-wider block mb-0.5">Air Pressure</span>
+                        <div class="font-bold text-slate-200 flex items-center gap-1">
+                            <i class="fa-solid fa-gauge text-purple-400"></i>
+                            <span id="current-pressure">-- hPa</span>
+                        </div>
+                    </div>
+                    <div class="bg-slate-950/60 p-2 rounded-lg border border-slate-800">
+                        <span class="text-[9px] font-semibold text-slate-400 uppercase tracking-wider block mb-0.5">Cloud Cover</span>
+                        <div class="font-bold text-slate-200 flex items-center gap-1">
+                            <i class="fa-solid fa-cloud text-sky-400"></i>
+                            <span id="current-clouds">--%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Wind Details Grid -->
+                <div class="grid grid-cols-2 gap-2">
+                    <div class="bg-slate-950/60 p-2 rounded-lg border border-slate-800 text-[11px]">
+                        <span class="text-[9px] font-semibold text-slate-400 uppercase tracking-wider block mb-0.5">Wind Speed</span>
+                        <div class="font-bold text-slate-200 flex items-center gap-1">
+                            <i class="fa-solid fa-wind text-teal-400"></i>
+                            <span id="current-wind">-- km/h</span>
+                            <span id="wind-arrow" class="inline-block transition-transform duration-300 font-bold">↑</span>
+                            <span id="wind-cardinal" class="text-[9px] text-slate-400 font-normal">(--)</span>
+                        </div>
+                    </div>
+                    <div class="bg-slate-950/60 p-2 rounded-lg border border-slate-800 text-[11px]">
+                        <span class="text-[9px] font-semibold text-slate-400 uppercase tracking-wider block mb-0.5">Wind Gusts</span>
+                        <div class="font-bold text-slate-200 flex items-center gap-1">
+                            <i class="fa-solid fa-arrow-up-right-dots text-emerald-400"></i>
+                            <span id="current-gusts">-- km/h</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sunrise & Sunset Times Card -->
+            <div class="bg-slate-900 border border-slate-800 p-3.5 rounded-xl shadow-lg space-y-3 shrink-0">
+                <h2 class="text-[11px] font-bold tracking-wider uppercase text-amber-400 flex items-center gap-1.5">
+                    <i class="fa-solid fa-sun text-amber-400"></i> Daylight
+                </h2>
+                
+                <div class="grid grid-cols-2 gap-2 text-[11px]">
+                    <div class="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800">
+                        <div class="flex items-center justify-between mb-0.5">
+                            <span class="text-slate-400">Sunrise</span>
+                            <i class="fa-solid fa-sun-plant-wilt text-amber-400"></i>
+                        </div>
+                        <div id="sun-sunrise" class="text-xs font-bold text-slate-100 font-mono">--:--</div>
+                    </div>
+                    <div class="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800">
+                        <div class="flex items-center justify-between mb-0.5">
+                            <span class="text-slate-400">Sunset</span>
+                            <i class="fa-solid fa-moon text-orange-400"></i>
+                        </div>
+                        <div id="sun-sunset" class="text-xs font-bold text-slate-100 font-mono">--:--</div>
+                    </div>
+                </div>
+
+                <div class="space-y-1.5 text-[11px]">
+                    <div class="p-2 bg-amber-500/10 border border-amber-500/20 rounded-lg space-y-0.5">
+                        <span class="font-semibold text-amber-300 flex items-center gap-1 text-[10px]">
+                            <i class="fa-solid fa-circle-half-stroke text-amber-400"></i> Golden Hour
+                        </span>
+                        <div class="flex justify-between text-slate-300 font-mono text-[10px]">
+                            <span>Morning: <strong id="golden-morning" class="text-slate-100">--:-- - --:--</strong></span>
+                            <span>Evening: <strong id="golden-evening" class="text-slate-100">--:-- - --:--</strong></span>
+                        </div>
+                    </div>
+                    <div class="p-2 bg-indigo-500/10 border border-indigo-500/20 rounded-lg space-y-0.5">
+                        <span class="font-semibold text-indigo-300 flex items-center gap-1 text-[10px]">
+                            <i class="fa-solid fa-cloud-moon text-indigo-400"></i> Blue Hour
+                        </span>
+                        <div class="flex justify-between text-slate-300 font-mono text-[10px]">
+                            <span>Morning: <strong id="blue-morning" class="text-slate-100">--:-- - --:--</strong></span>
+                            <span>Evening: <strong id="blue-evening" class="text-slate-100">--:-- - --:--</strong></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- RIGHT COLUMN: Ecological Season, Micro-Habitat, & Hourly Avian Activity Feed (7 Columns) -->
+        <div class="lg:col-span-7 flex flex-col gap-3 overflow-hidden">
+
+            <!-- Regional Ecological Season Banner (Compact Side-by-Side) -->
+            <div class="bg-slate-900 border border-slate-800 p-3 rounded-xl shadow-lg space-y-2 shrink-0">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-[11px] font-bold tracking-wider uppercase text-emerald-400 flex items-center gap-1.5">
+                        <i class="fa-solid fa-earth-americas text-emerald-400"></i> Seasonal Cycle
+                    </h2>
+                    <span class="text-[9px] text-slate-400 font-medium">Regional Cycle</span>
+                </div>
+                
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                    <!-- Seasonal Migration Card -->
+                    <div class="bg-slate-950/80 border border-slate-800 p-2.5 rounded-lg flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-2 min-w-0">
+                            <div class="p-1 bg-teal-500/10 text-teal-400 rounded border border-teal-500/20 shrink-0">
+                                <i class="fa-solid fa-compass text-xs"></i>
+                            </div>
+                            <div class="min-w-0">
+                                <span class="text-[10px] text-slate-400 font-semibold block">Migration</span>
+                                <span id="migration-status-text" class="text-[11px] font-bold text-white truncate block">--</span>
+                            </div>
+                        </div>
+                        <span id="migration-badge" class="text-[8px] uppercase font-bold px-1.5 py-0.5 rounded bg-slate-900 text-teal-300 border border-teal-500/30 shrink-0 whitespace-nowrap">--</span>
+                    </div>
+
+                    <!-- Nesting & Breeding Card -->
+                    <div class="bg-slate-950/80 border border-slate-800 p-2.5 rounded-lg flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-2 min-w-0">
+                            <div class="p-1 bg-pink-500/10 text-pink-400 rounded border border-pink-500/20 shrink-0">
+                                <i class="fa-solid fa-heart text-xs"></i>
+                            </div>
+                            <div class="min-w-0">
+                                <span class="text-[10px] text-slate-400 font-semibold block">Nesting & Breeding</span>
+                                <span id="breeding-status-text" class="text-[11px] font-bold text-white truncate block">--</span>
+                            </div>
+                        </div>
+                        <span id="breeding-badge" class="text-[8px] uppercase font-bold px-1.5 py-0.5 rounded bg-slate-900 text-pink-300 border border-pink-500/30 shrink-0 whitespace-nowrap">--</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Micro-Habitat Selector & Hourly Header -->
+            <div class="bg-slate-900 border border-slate-800 p-3 rounded-xl shadow-lg flex flex-col sm:flex-row items-center justify-between gap-2.5 shrink-0">
+                <div class="flex items-center gap-2 w-full sm:w-auto">
+                    <span class="text-[11px] font-bold tracking-wider uppercase text-emerald-400 shrink-0 flex items-center gap-1.5">
+                        <i class="fa-solid fa-tree"></i> Habitat:
+                    </span>
+                    <div class="grid grid-cols-4 gap-1.5 text-[10px] flex-1" id="habitat-selector">
+                        <button data-habitat="woodland" class="habitat-btn active px-2.5 py-1 rounded-lg bg-emerald-600 text-white font-semibold border border-emerald-500 transition-all">Woodland & garden</button>
+                        <button data-habitat="open" class="habitat-btn px-2.5 py-1 rounded-lg bg-slate-950 text-slate-300 hover:text-white font-medium border border-slate-800 transition-all">Open fields & plains</button>
+                        <button data-habitat="coastal" class="habitat-btn px-2.5 py-1 rounded-lg bg-slate-950 text-slate-300 hover:text-white font-medium border border-slate-800 transition-all">Coast & wetlands</button>
+                        <button data-habitat="urban" class="habitat-btn px-2.5 py-1 rounded-lg bg-slate-950 text-slate-300 hover:text-white font-medium border border-slate-800 transition-all">Urban</button>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end">
+                    <button id="toggle-next-day-btn" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 px-2.5 py-1 rounded-lg text-[10px] text-slate-300 font-semibold transition-all">
+                        View Tomorrow
+                    </button>
+                </div>
+            </div>
+
+            <!-- Scrollable Hourly Feed Container -->
+            <div class="flex-1 overflow-y-auto custom-scrollbar space-y-2 pr-1" id="hourly-activity-feed">
+                <!-- Injected via JavaScript -->
+            </div>
+
+            <!-- Bottom Action: About Dynamic Activity Calculations Button -->
+            <div class="shrink-0 pt-0.5">
+                <button id="open-about-modal-btn" class="w-full py-2.5 bg-slate-900 hover:bg-emerald-600/90 text-slate-200 hover:text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 border border-slate-800 shadow-lg">
+                    <i class="fa-solid fa-circle-info text-emerald-400"></i> About
+                </button>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Detailed "About Dynamic Calculations" Modal -->
+    <div id="about-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-xl w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto space-y-4">
+            <button id="close-modal-x" class="absolute top-4 right-4 text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-all">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+            <div class="flex items-center gap-3">
+                <div class="p-3 bg-emerald-600/20 text-emerald-400 rounded-xl border border-emerald-500/30">
+                    <i class="fa-solid fa-chart-pie text-xl"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-bold text-white">Guild-Based Calculation Architecture</h3>
+                    <p class="text-xs text-slate-400">Adaptive climate scaling and micro-habitat adjustments</p>
+                </div>
+            </div>
+            
+            <div class="space-y-3.5 text-xs text-slate-300">
+                <div class="bg-slate-950/60 p-3.5 rounded-xl border border-slate-800 space-y-1">
+                    <h4 class="font-bold uppercase tracking-wider text-emerald-400">Overview</h4>
+                    <p class="text-slate-300 leading-relaxed">
+                        Thresholds for wind speed tolerance, heat/cold stress, and precipitation are dynamically scaled based on geographic latitude and local baseline climate.
+                    </p>
+                </div>
+
+                <div class="space-y-2">
+                    <h4 class="font-bold uppercase tracking-wider text-slate-400">Functional Avian Guild Breakdown</h4>
+                    
+                    <div class="bg-slate-950/50 p-3 rounded-xl border border-slate-800 space-y-1">
+                        <div class="flex justify-between font-bold text-white">
+                            <span>1. Songbirds & Garden Birds (Passerines)</span>
+                            <span class="text-emerald-400">High Canopy/Bush Sensitivity</span>
+                        </div>
+                        <p class="text-slate-400 text-[11px]">Highly sensitive to high winds and rain. Peak vocal activity during golden hour dawn/dusk.</p>
+                    </div>
+
+                    <div class="bg-slate-950/50 p-3 rounded-xl border border-slate-800 space-y-1">
+                        <div class="flex justify-between font-bold text-white">
+                            <span>2. Insect Hunters (Swallows, Martins, Swifts)</span>
+                            <span class="text-teal-400">Barometric & Humidity Driven</span>
+                        </div>
+                        <p class="text-slate-400 text-[11px]">Tracks lower atmospheric air pressure shifts and high humidity pushing insects near ground or water level.</p>
+                    </div>
+
+                    <div class="bg-slate-950/50 p-3 rounded-xl border border-slate-800 space-y-1">
+                        <div class="flex justify-between font-bold text-white">
+                            <span>3. Soaring Raptors (Hawks, Eagles, Vultures)</span>
+                            <span class="text-amber-400">Thermal Lift & Solar Angle</span>
+                        </div>
+                        <p class="text-slate-400 text-[11px]">Calculates solar noon thermal updrafts, cloud cover transparency, and moderate wind speeds for optimal soaring.</p>
+                    </div>
+
+                    <div class="bg-slate-950/50 p-3 rounded-xl border border-slate-800 space-y-1">
+                        <div class="flex justify-between font-bold text-white">
+                            <span>4. Waterfowl & Coastal Birds (Gulls, Ducks, Herons)</span>
+                            <span class="text-cyan-400">High Weather Tolerance</span>
+                        </div>
+                        <p class="text-slate-400 text-[11px]">Robust against strong winds and rain; high activity during storm fronts and tidal feeding shifts in coastal/wetland habitats.</p>
+                    </div>
+                </div>
+
+                <div class="bg-slate-950/60 p-3 rounded-xl border border-slate-800 space-y-1 text-slate-300">
+                    <h4 class="font-bold uppercase tracking-wider text-slate-400 text-[10px]">Habitat & Latitude Modifiers</h4>
+                    <p class="text-[11px] leading-relaxed">
+                        Selecting a micro-habitat applies environmental multipliers (e.g., Woodland buffers wind for Songbirds; Coastal boosts Waterfowl & Gull activity while increasing wind exposure penalty for Passerines).
+                    </p>
+                </div>
+            </div>
+
+            <div class="pt-3 border-t border-slate-800 flex justify-end">
+                <button id="close-modal-btn" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs rounded-xl shadow-lg transition-all">
+                    Close Explanation
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Application Logic -->
+    <script>
+        // Global Application State
+        let appState = {
+            lat: null,
+            lon: null,
+            locationName: "Not available; check back later.",
+            isDataAvailable: false,
+            weather: null,
+            hourly: null,
+            daily: null,
+            habitat: 'woodland', // woodland, open, coastal, urban
+            showTomorrow: false
+        };
+
+        const UNAVAILABLE_TEXT = "Not available; check back later.";
+        const POST_SUNSET_BUFFER_MS = 60 * 60 * 1000; // 1 hour post-sunset buffer
+
+        // Habitat Multipliers per Guild
+        const HABITAT_MODIFIERS = {
+            woodland: { songbird: 1.25, insect: 1.0, raptor: 0.85, waterfowl: 0.7 },
+            open:     { songbird: 0.85, insect: 1.2, raptor: 1.25, waterfowl: 0.8 },
+            coastal:  { songbird: 0.75, insect: 1.1, raptor: 1.0,  waterfowl: 1.35 },
+            urban:    { songbird: 0.95, insect: 0.8, raptor: 0.75, waterfowl: 0.85 }
+        };
+
+        // WMO Code Map
+        const WMO_CODES = {
+            0: { label: "Clear Sky", icon: "fa-sun" },
+            1: { label: "Mostly Clear", icon: "fa-sun" },
+            2: { label: "Partly Cloudy", icon: "fa-cloud-sun" },
+            3: { label: "Overcast", icon: "fa-cloud" },
+            45: { label: "Foggy", icon: "fa-smog" },
+            48: { label: "Frosty Fog", icon: "fa-smog" },
+            51: { label: "Light Drizzle", icon: "fa-cloud-rain" },
+            53: { label: "Moderate Drizzle", icon: "fa-cloud-rain" },
+            55: { label: "Heavy Drizzle", icon: "fa-cloud-showers-heavy" },
+            61: { label: "Light Rain", icon: "fa-cloud-rain" },
+            63: { label: "Moderate Rain", icon: "fa-cloud-showers-heavy" },
+            65: { label: "Heavy Rain", icon: "fa-cloud-showers-heavy" },
+            71: { label: "Light Snow", icon: "fa-snowflake" },
+            73: { label: "Moderate Snow", icon: "fa-snowflake" },
+            75: { label: "Heavy Snow", icon: "fa-snowflake" },
+            80: { label: "Light Rain Showers", icon: "fa-cloud-sun-rain" },
+            81: { label: "Moderate Rain Showers", icon: "fa-cloud-showers-heavy" },
+            82: { label: "Heavy Rain Showers", icon: "fa-cloud-showers-water" },
+            95: { label: "Thunderstorm", icon: "fa-cloud-bolt" }
+        };
+
+        function getWindDirectionCardinal(deg) {
+            if (deg === null || deg === undefined) return "--";
+            const directions = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
+            const index = Math.round(deg / 22.5) % 16;
+            return directions[index];
+        }
+
+        async function fetchWeatherData(lat, lon, locationLabel) {
+            appState.lat = lat;
+            appState.lon = lon;
+            appState.locationName = locationLabel;
+
+            const nameEl = document.getElementById('location-name');
+            const coordsEl = document.getElementById('coords-text');
+            const badgeEl = document.getElementById('network-badge');
+
+            nameEl.textContent = locationLabel;
+            coordsEl.textContent = `Lat: ${lat.toFixed(2)}, Lon: ${lon.toFixed(2)}`;
+            badgeEl.textContent = "Fetching Live Data...";
+            badgeEl.className = "block text-[9px] text-amber-400 mt-0.5 font-medium";
+
+            try {
+                const apiUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,surface_pressure,wind_speed_10m,wind_direction_10m,wind_gusts_10m,cloud_cover&hourly=temperature_2m,precipitation_probability,precipitation,weather_code,relative_humidity_2m,surface_pressure,cloud_cover,wind_speed_10m&daily=sunrise,sunset&forecast_days=2&timezone=auto`;
+                
+                const response = await fetch(apiUrl);
+                if (!response.ok) throw new Error("API request failed");
+
+                const data = await response.json();
+                if (!data.current || !data.hourly) throw new Error("Invalid weather data format");
+
+                appState.weather = data.current;
+                appState.hourly = data.hourly;
+                appState.daily = data.daily;
+                appState.isDataAvailable = true;
+
+                badgeEl.textContent = "● Live Open-Meteo";
+                badgeEl.className = "block text-[9px] text-emerald-400 mt-0.5 font-medium";
+            } catch (error) {
+                console.error("Weather data fetch error:", error);
+                appState.weather = null;
+                appState.hourly = null;
+                appState.daily = null;
+                appState.isDataAvailable = false;
+
+                badgeEl.textContent = "● Offline / Unavailable";
+                badgeEl.className = "block text-[9px] text-red-400 mt-0.5 font-medium";
+            }
+
+            renderAllModules();
+        }
+
+        function renderAllModules() {
+            renderCurrentWeather();
+            renderPhotoperiod();
+            renderEcologicalStatus();
+            renderHourlyActivityFeed();
+        }
+
+        function renderCurrentWeather() {
+            const tempEl = document.getElementById('current-temp');
+            const apparentEl = document.getElementById('apparent-temp');
+            const humEl = document.getElementById('current-humidity');
+            const pressEl = document.getElementById('current-pressure');
+            const cloudsEl = document.getElementById('current-clouds');
+            const windEl = document.getElementById('current-wind');
+            const gustsEl = document.getElementById('current-gusts');
+            const descEl = document.getElementById('weather-desc');
+            const cardinalEl = document.getElementById('wind-cardinal');
+            const arrowEl = document.getElementById('wind-arrow');
+            const iconContainer = document.getElementById('weather-icon-container');
+
+            if (!appState.isDataAvailable || !appState.weather) {
+                tempEl.textContent = "--";
+                apparentEl.textContent = UNAVAILABLE_TEXT;
+                humEl.textContent = "--";
+                pressEl.textContent = "--";
+                cloudsEl.textContent = "--";
+                windEl.textContent = "--";
+                gustsEl.textContent = "--";
+                descEl.textContent = "Unavailable";
+                return;
+            }
+
+            const w = appState.weather;
+            tempEl.textContent = Math.round(w.temperature_2m);
+            apparentEl.textContent = `${Math.round(w.apparent_temperature)}°C`;
+            humEl.textContent = `${w.relative_humidity_2m}%`;
+            pressEl.textContent = `${w.surface_pressure} hPa`;
+            cloudsEl.textContent = `${w.cloud_cover}%`;
+            windEl.textContent = `${w.wind_speed_10m} km/h`;
+            gustsEl.textContent = `${w.wind_gusts_10m ?? w.wind_speed_10m} km/h`;
+
+            const cardinal = getWindDirectionCardinal(w.wind_direction_10m);
+            cardinalEl.textContent = `(${cardinal})`;
+            if (w.wind_direction_10m !== null) {
+                arrowEl.style.transform = `rotate(${w.wind_direction_10m}deg)`;
+            }
+
+            const wmo = WMO_CODES[w.weather_code] || { label: "Clear", icon: "fa-sun" };
+            descEl.textContent = wmo.label;
+            iconContainer.innerHTML = `<i class="fa-solid ${wmo.icon} text-2xl"></i>`;
+        }
+
+        function renderPhotoperiod() {
+            const sunriseEl = document.getElementById('sun-sunrise');
+            const sunsetEl = document.getElementById('sun-sunset');
+            const goldenM = document.getElementById('golden-morning');
+            const goldenE = document.getElementById('golden-evening');
+            const blueM = document.getElementById('blue-morning');
+            const blueE = document.getElementById('blue-evening');
+
+            if (!appState.isDataAvailable || !appState.daily || !appState.daily.sunrise || !appState.daily.sunrise[0]) {
+                sunriseEl.textContent = "--:--";
+                sunsetEl.textContent = "--:--";
+                goldenM.textContent = "--:-- - --:--";
+                goldenE.textContent = "--:-- - --:--";
+                blueM.textContent = "--:-- - --:--";
+                blueE.textContent = "--:-- - --:--";
+                return;
+            }
+
+            const sunriseDate = new Date(appState.daily.sunrise[0]);
+            const sunsetDate = new Date(appState.daily.sunset[0]);
+
+            sunriseEl.textContent = sunriseDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            sunsetEl.textContent = sunsetDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            const fmt = (d) => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            const gMStart = new Date(sunriseDate.getTime());
+            const gMEnd = new Date(sunriseDate.getTime() + 60 * 60 * 1000);
+            goldenM.textContent = `${fmt(gMStart)} - ${fmt(gMEnd)}`;
+
+            const gEStart = new Date(sunsetDate.getTime() - 60 * 60 * 1000);
+            const gEEnd = new Date(sunsetDate.getTime());
+            goldenE.textContent = `${fmt(gEStart)} - ${fmt(gEEnd)}`;
+
+            const bMStart = new Date(sunriseDate.getTime() - 45 * 60 * 1000);
+            const bMEnd = new Date(sunriseDate.getTime());
+            blueM.textContent = `${fmt(bMStart)} - ${fmt(bMEnd)}`;
+
+            const bEStart = new Date(sunsetDate.getTime());
+            const bEEnd = new Date(sunsetDate.getTime() + 45 * 60 * 1000);
+            blueE.textContent = `${fmt(bEStart)} - ${fmt(bEEnd)}`;
+        }
+
+        function renderEcologicalStatus() {
+            const migBadge = document.getElementById('migration-badge');
+            const migText = document.getElementById('migration-status-text');
+            const breedBadge = document.getElementById('breeding-badge');
+            const breedText = document.getElementById('breeding-status-text');
+
+            if (!appState.isDataAvailable) {
+                migBadge.textContent = "Unavailable";
+                migText.textContent = UNAVAILABLE_TEXT;
+                breedBadge.textContent = "Unavailable";
+                breedText.textContent = UNAVAILABLE_TEXT;
+                return;
+            }
+
+            const month = new Date().getMonth() + 1;
+            const isNorthernHemisphere = (appState.lat >= 0);
+
+            if (isNorthernHemisphere) {
+                if (month >= 3 && month <= 5) {
+                    migBadge.textContent = "Active";
+                    migText.textContent = "Spring northward migration";
+                } else if (month >= 8 && month <= 11) {
+                    migBadge.textContent = "Active";
+                    migText.textContent = "Fall southward migration";
+                } else {
+                    migBadge.textContent = "Inactive";
+                    migText.textContent = "Winter resident flocking";
+                }
+
+                if (month >= 4 && month <= 7) {
+                    breedBadge.textContent = "Active";
+                    breedText.textContent = "Active nesting";
+                } else {
+                    breedBadge.textContent = "Inactive";
+                    breedText.textContent = "Non-nesting phase";
+                }
+            } else {
+                if (month >= 9 && month <= 11) {
+                    migBadge.textContent = "Active";
+                    migText.textContent = "Spring northward migration";
+                } else if (month >= 3 && month <= 6) {
+                    migBadge.textContent = "Active";
+                    migText.textContent = "Fall southward migration";
+                } else {
+                    migBadge.textContent = "Inactive";
+                    migText.textContent = "Winter resident flocks";
+                }
+
+                if (month >= 10 || month <= 2) {
+                    breedBadge.textContent = "Active";
+                    breedText.textContent = "Active nesting";
+                } else {
+                    breedBadge.textContent = "Inactive";
+                    breedText.textContent = "Non-nesting phase";
+                }
+            }
+        }
+
+        function isDaylightOrTwilight(targetTime, sunriseTimeStr, sunsetTimeStr) {
+            if (!sunriseTimeStr || !sunsetTimeStr) return true;
+            const sunrise = new Date(sunriseTimeStr).getTime();
+            const sunset = new Date(sunsetTimeStr).getTime();
+            const t = targetTime.getTime();
+
+            const morningDawnThreshold = sunrise - (45 * 60 * 1000);
+            const eveningDuskThreshold = sunset + POST_SUNSET_BUFFER_MS;
+
+            return t >= morningDawnThreshold && t <= eveningDuskThreshold;
+        }
+
+        function computeGuildScores(index, hourlyData, sunInfo) {
+            const temp = hourlyData.temperature_2m[index];
+            const hum = hourlyData.relative_humidity_2m[index];
+            const press = hourlyData.surface_pressure[index];
+            const cloudCover = hourlyData.cloud_cover[index] ?? 50;
+            const wind = hourlyData.wind_speed_10m[index];
+            const precip = hourlyData.precipitation ? (hourlyData.precipitation[index] || 0) : 0;
+            const targetTime = new Date(hourlyData.time[index]);
+
+            const absLat = Math.abs(appState.lat || 45);
+            const coldToleranceOffset = Math.min(10, (absLat / 90) * 12);
+
+            // 1. Songbirds Guild
+            let photoScore = 15;
+            if (sunInfo.sunrise && sunInfo.sunset) {
+                const sr = new Date(sunInfo.sunrise);
+                const ss = new Date(sunInfo.sunset);
+                const minToSr = Math.abs(targetTime - sr) / (1000 * 60);
+                const minToSs = Math.abs(targetTime - ss) / (1000 * 60);
+                if (minToSr <= 90) photoScore = Math.max(20, 100 - (minToSr / 90) * 80);
+                else if (minToSs <= 60) photoScore = Math.max(20, 100 - (minToSs / 60) * 80);
+            }
+            const adaptedMinTemp = 10 - coldToleranceOffset;
+            let tempSongScore = (temp >= adaptedMinTemp && temp <= 26) ? 100 : (temp < adaptedMinTemp - 10 || temp > 36) ? 15 : 60;
+            let windSongScore = wind < 12 ? 100 : wind < 25 ? 60 : 15;
+            let rainSongScore = precip > 0 ? 10 : Math.max(20, 100 - cloudCover * 0.5);
+            let songbirdRaw = (photoScore * 0.35) + (tempSongScore * 0.25) + (windSongScore * 0.25) + (rainSongScore * 0.15);
+
+            // 2. Insect Hunters Guild
+            let humScore = hum > 70 ? 100 : hum > 50 ? 70 : 30;
+            let pressScore = press < 1008 ? 100 : press < 1013.25 ? 70 : 35;
+            let precipInsectScore = precip === 0 ? 100 : precip < 1.0 ? 50 : 10;
+            let windInsectScore = wind < 18 ? 100 : wind < 32 ? 55 : 10;
+            let insectRaw = (humScore * 0.35) + (pressScore * 0.25) + (precipInsectScore * 0.25) + (windInsectScore * 0.15);
+
+            // 3. Soaring Raptors Guild
+            let skyRaptorScore = Math.max(10, 100 - cloudCover);
+            let windRaptorScore = (wind >= 10 && wind <= 28) ? 100 : wind < 5 ? 35 : 50;
+            let thermalScore = 20;
+            if (sunInfo.sunrise && sunInfo.sunset) {
+                const sr = new Date(sunInfo.sunrise).getTime();
+                const ss = new Date(sunInfo.sunset).getTime();
+                const solarNoon = sr + (ss - sr) / 2;
+                const hoursFromNoon = Math.abs(targetTime.getTime() - solarNoon) / (1000 * 3600);
+                if (hoursFromNoon <= 3.5 && temp > (5 - coldToleranceOffset)) {
+                    thermalScore = Math.max(30, 100 - (hoursFromNoon / 3.5) * 70);
+                }
+            }
+            let raptorRaw = (skyRaptorScore * 0.35) + (windRaptorScore * 0.35) + (thermalScore * 0.30);
+
+            // 4. Waterfowl & Coastal Birds Guild
+            let windWaterfowlScore = wind > 20 ? 95 : wind > 10 ? 80 : 60;
+            let precipWaterfowlScore = precip > 0 ? 90 : 70;
+            let tempWaterfowlScore = (temp >= -5 - coldToleranceOffset && temp <= 30) ? 90 : 50;
+            let waterfowlRaw = (windWaterfowlScore * 0.35) + (precipWaterfowlScore * 0.35) + (tempWaterfowlScore * 0.30);
+
+            const mods = HABITAT_MODIFIERS[appState.habitat] || HABITAT_MODIFIERS.woodland;
+            const songbirdScore  = Math.min(100, Math.round(songbirdRaw * mods.songbird));
+            const insectScore    = Math.min(100, Math.round(insectRaw * mods.insect));
+            const raptorScore    = Math.min(100, Math.round(raptorRaw * mods.raptor));
+            const waterfowlScore = Math.min(100, Math.round(waterfowlRaw * mods.waterfowl));
+
+            const combinedIndex = Math.round(
+                (songbirdScore * 0.30) +
+                (insectScore * 0.25) +
+                (raptorScore * 0.25) +
+                (waterfowlScore * 0.20)
+            );
+
+            return {
+                combinedIndex,
+                songbirdScore,
+                insectScore,
+                raptorScore,
+                waterfowlScore
+            };
+        }
+
+        function renderHourlyActivityFeed() {
+            const feed = document.getElementById('hourly-activity-feed');
+            feed.innerHTML = '';
+
+            if (!appState.isDataAvailable || !appState.hourly || !appState.hourly.time) {
+                feed.innerHTML = `<div class="bg-slate-900 border border-slate-800 p-4 rounded-xl text-center text-xs text-slate-400 italic">${UNAVAILABLE_TEXT}</div>`;
+                return;
+            }
+
+            const hourly = appState.hourly;
+            const currHourIndex = new Date().getHours();
+            let startIdx = appState.showTomorrow ? 24 : currHourIndex;
+            let endIdx = appState.showTomorrow ? 48 : startIdx + 24;
+
+            let renderedCount = 0;
+            let lastDayDateStr = null;
+
+            for (let i = startIdx; i < endIdx && i < hourly.time.length; i++) {
+                const targetTime = new Date(hourly.time[i]);
+                const dayIndex = targetTime.getDate() === new Date(hourly.time[0]).getDate() ? 0 : 1;
+
+                const sunInfo = {
+                    sunrise: appState.daily?.sunrise?.[dayIndex] || null,
+                    sunset: appState.daily?.sunset?.[dayIndex] || null
+                };
+
+                if (!isDaylightOrTwilight(targetTime, sunInfo.sunrise, sunInfo.sunset)) {
+                    continue;
+                }
+
+                const currentDateStr = targetTime.toDateString();
+                if (lastDayDateStr !== null && lastDayDateStr !== currentDateStr) {
+                    // Insert a nice non-intrusive night transition divider
+                    const divider = document.createElement('div');
+                    divider.className = 'flex items-center my-2 px-1';
+                    divider.innerHTML = `
+                        <div class="flex-grow border-t border-slate-800"></div>
+                        <span class="mx-3 px-2.5 py-0.5 rounded-full bg-slate-900 border border-slate-800 text-[9px] uppercase tracking-wider font-semibold text-indigo-400 flex items-center gap-1.5 shadow-sm">
+                            <i class="fa-solid fa-moon text-[8px]"></i> Night Transition
+                        </span>
+                        <div class="flex-grow border-t border-slate-800"></div>
+                    `;
+                    feed.appendChild(divider);
+                }
+                lastDayDateStr = currentDateStr;
+
+                renderedCount++;
+                const timeStr = targetTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const temp = Math.round(hourly.temperature_2m[i]);
+                const wCode = hourly.weather_code[i];
+                const info = WMO_CODES[wCode] || { label: "Clear", icon: "fa-sun" };
+
+                const scores = computeGuildScores(i, hourly, sunInfo);
+                const badgeInfo = getScoreLevelBadge(scores.combinedIndex);
+
+                const card = document.createElement('div');
+                card.className = 'bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-md flex flex-col space-y-2';
+
+                card.innerHTML = `
+                    <div class="flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-2.5">
+                            <span class="text-xs font-bold font-mono text-slate-300 w-11">${timeStr}</span>
+                            <div class="p-1.5 bg-slate-950 rounded-lg text-amber-400 border border-slate-800">
+                                <i class="fa-solid ${info.icon} text-sm"></i>
+                            </div>
+                            <div>
+                                <span class="text-xs font-bold text-white block">${info.label}</span>
+                                <span class="text-[10px] text-slate-400 font-mono">${temp}°C</span>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-2">
+                            <span class="text-sm font-extrabold text-white font-mono">${scores.combinedIndex}%</span>
+                            <span class="inline-flex items-center justify-center text-[8px] uppercase font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${badgeInfo.bg} ${badgeInfo.text} border ${badgeInfo.border}">
+                                ${badgeInfo.label}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="w-full bg-slate-950 rounded-full h-1 overflow-hidden border border-slate-800">
+                        <div class="bg-gradient-to-r from-teal-500 to-emerald-400 h-1 rounded-full transition-all duration-500" style="width: ${scores.combinedIndex}%"></div>
+                    </div>
+
+                    <!-- Guild Activity Breakdown Grid -->
+                    <div class="grid grid-cols-4 gap-1.5 pt-0.5 text-[10px]">
+                        <div class="bg-slate-950/70 p-1.5 rounded-lg border border-slate-800/80 flex items-center justify-between">
+                            <span class="text-[9px] font-medium text-slate-400 truncate">Songbirds</span>
+                            <span class="font-bold text-emerald-300 font-mono">${scores.songbirdScore}%</span>
+                        </div>
+                        <div class="bg-slate-950/70 p-1.5 rounded-lg border border-slate-800/80 flex items-center justify-between">
+                            <span class="text-[9px] font-medium text-slate-400 truncate">Insect</span>
+                            <span class="font-bold text-teal-300 font-mono">${scores.insectScore}%</span>
+                        </div>
+                        <div class="bg-slate-950/70 p-1.5 rounded-lg border border-slate-800/80 flex items-center justify-between">
+                            <span class="text-[9px] font-medium text-slate-400 truncate">Raptors</span>
+                            <span class="font-bold text-amber-300 font-mono">${scores.raptorScore}%</span>
+                        </div>
+                        <div class="bg-slate-950/70 p-1.5 rounded-lg border border-slate-800/80 flex items-center justify-between">
+                            <span class="text-[9px] font-medium text-slate-400 truncate">Waterfowl</span>
+                            <span class="font-bold text-cyan-300 font-mono">${scores.waterfowlScore}%</span>
+                        </div>
+                    </div>
+                `;
+
+                feed.appendChild(card);
+            }
+
+            if (renderedCount === 0) {
+                feed.innerHTML = `
+                    <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl text-center space-y-2.5">
+                        <div class="p-2.5 bg-indigo-500/10 text-indigo-400 rounded-full w-10 h-10 mx-auto flex items-center justify-center border border-indigo-500/20">
+                            <i class="fa-solid fa-moon text-base"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-xs font-bold text-white">Daytime Birding Hours Have Ended</h3>
+                            <p class="text-[11px] text-slate-400 mt-0.5 max-w-xs mx-auto">
+                                Diurnal bird activity has concluded for tonight. Check back at dawn or explore tomorrow's forecast.
+                            </p>
+                        </div>
+                        <button id="view-tomorrow-banner-btn" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-[11px] rounded-lg transition-all shadow-md">
+                            View Tomorrow's Daylight Hours
+                        </button>
+                    </div>
+                `;
+
+                document.getElementById('view-tomorrow-banner-btn')?.addEventListener('click', () => {
+                    appState.showTomorrow = true;
+                    document.getElementById('toggle-next-day-btn').textContent = "View Today";
+                    renderHourlyActivityFeed();
+                });
+            }
+        }
+
+        function getScoreLevelBadge(score) {
+            if (score >= 70) {
+                return { label: 'High Activity', bg: 'bg-emerald-500/20', text: 'text-emerald-300', border: 'border-emerald-500/30' };
+            } else if (score >= 45) {
+                return { label: 'Moderate Activity', bg: 'bg-amber-500/20', text: 'text-amber-300', border: 'border-amber-500/30' };
+            } else {
+                return { label: 'Low Activity', bg: 'bg-slate-800', text: 'text-slate-400', border: 'border-slate-700' };
+            }
+        }
+
+        // Micro-Habitat Selector Listener
+        document.getElementById('habitat-selector').addEventListener('click', (e) => {
+            const btn = e.target.closest('.habitat-btn');
+            if (!btn) return;
+
+            document.querySelectorAll('.habitat-btn').forEach(b => {
+                b.className = 'habitat-btn px-2.5 py-1 rounded-lg bg-slate-950 text-slate-300 hover:text-white font-medium border border-slate-800 transition-all';
+            });
+            btn.className = 'habitat-btn active px-2.5 py-1 rounded-lg bg-emerald-600 text-white font-semibold border border-emerald-500 transition-all';
+            
+            appState.habitat = btn.getAttribute('data-habitat');
+            renderHourlyActivityFeed();
+        });
+
+        // Toggle Day Listener
+        document.getElementById('toggle-next-day-btn').addEventListener('click', (e) => {
+            appState.showTomorrow = !appState.showTomorrow;
+            e.target.textContent = appState.showTomorrow ? "View today" : "View tomorrow";
+            renderHourlyActivityFeed();
+        });
+
+        function openModal() {
+            document.getElementById('about-modal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('about-modal').classList.add('hidden');
+        }
+
+        // Search Input & Geocoding
+        const searchInput = document.getElementById('location-search');
+        const searchResults = document.getElementById('search-results');
+        const clearBtn = document.getElementById('clear-search-btn');
+        let debounceTimer;
+
+        searchInput.addEventListener('input', (e) => {
+            const query = e.target.value.trim();
+            clearBtn.classList.toggle('hidden', query.length === 0);
+
+            clearTimeout(debounceTimer);
+            if (query.length < 2) {
+                searchResults.classList.add('hidden');
+                return;
+            }
+
+            debounceTimer = setTimeout(async () => {
+                try {
+                    const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=5&language=en&format=json`);
+                    if (!res.ok) return;
+                    const data = await res.json();
+
+                    if (!data.results || data.results.length === 0) {
+                        searchResults.innerHTML = `<div class="p-3 text-xs text-slate-400 italic">No locations found</div>`;
+                        searchResults.classList.remove('hidden');
+                        return;
+                    }
+
+                    searchResults.innerHTML = '';
+                    data.results.forEach(loc => {
+                        const item = document.createElement('div');
+                        item.className = 'p-2.5 hover:bg-slate-700/70 cursor-pointer text-xs border-b border-slate-700/50 last:border-none text-slate-200 flex justify-between items-center';
+                        const adminStr = loc.admin1 ? `, ${loc.admin1}` : '';
+                        const countryStr = loc.country ? ` (${loc.country})` : '';
+                        
+                        item.innerHTML = `
+                            <span class="font-medium text-white">${loc.name}${adminStr}${countryStr}</span>
+                            <span class="text-[10px] text-slate-400 font-mono">${loc.latitude.toFixed(2)}, ${loc.longitude.toFixed(2)}</span>
+                        `;
+                        item.addEventListener('click', () => {
+                            const label = `${loc.name}${adminStr}${countryStr}`;
+                            searchInput.value = label;
+                            searchResults.classList.add('hidden');
+                            fetchWeatherData(loc.latitude, loc.longitude, label);
+                        });
+                        searchResults.appendChild(item);
+                    });
+                    searchResults.classList.remove('hidden');
+                } catch (err) {
+                    console.error("Geocoding search failed:", err);
+                }
+            }, 300);
+        });
+
+        clearBtn.addEventListener('click', () => {
+            searchInput.value = '';
+            clearBtn.classList.add('hidden');
+            searchResults.classList.add('hidden');
+        });
+
+        // Browser Geolocation
+        document.getElementById('gps-btn').addEventListener('click', () => {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => {
+                        fetchWeatherData(pos.coords.latitude, pos.coords.longitude, "Your Current Location");
+                    },
+                    (err) => {
+                        console.warn("GPS failed:", err);
+                        alert("Unable to access location. Please search for a city manually.");
+                    }
+                );
+            } else {
+                alert("Geolocation is not supported by your browser.");
+            }
+        });
+
+        function updateLocalClock() {
+            const timeEl = document.getElementById('local-time');
+            timeEl.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        }
+        setInterval(updateLocalClock, 1000);
+        updateLocalClock();
+
+        document.getElementById('open-about-modal-btn').addEventListener('click', openModal);
+        document.getElementById('close-modal-x').addEventListener('click', closeModal);
+        document.getElementById('close-modal-btn').addEventListener('click', closeModal);
+        document.getElementById('about-modal').addEventListener('click', (e) => {
+            if (e.target.id === 'about-modal') closeModal();
+        });
+
+        window.addEventListener('DOMContentLoaded', () => {
+            fetchWeatherData(52.0907, 4.4921, "Zoetermeer, Netherlands");
+        });
+    </script>
+</body>
+</html>
